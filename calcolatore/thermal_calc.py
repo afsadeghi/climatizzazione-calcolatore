@@ -29,8 +29,8 @@ class DatiStanza:
     nome: str
     superficie: float  # m²
     altezza: float  # m
-    num_esposizioni: int  # numero di lati (pareti) esposti all'esterno
     superficie_finestre: float = 0.0  # m², superficie vetrata totale
+    stanza_angolo: bool = False  # True se la stanza ha 2 lati esterni distinti (es. N e E)
     ricambi_aria_orari: float = 0.5  # vol/h (default residenziale UNI 10339)
     ultimo_piano: bool = False  # True se soffitto disperdente verso l'esterno
     piano_terra: bool = False  # True se pavimento disperdente verso terreno/locale non riscaldato
@@ -55,11 +55,14 @@ def superficie_parete_esterna_lorda(dati: DatiStanza) -> float:
     """Stima la superficie lorda di parete esterna disperdente.
 
     Semplificazione per dimensionamento preliminare: la stanza è assimilata
-    a una pianta quadrata di lato sqrt(superficie). Ogni lato esposto
-    all'esterno (num_esposizioni) contribuisce con lato × altezza.
+    a una pianta quadrata di lato sqrt(superficie). Una singola esposizione
+    (anche composta, es. "N-E") vale 1 solo lato esterno; solo una stanza
+    d'angolo (stanza_angolo=True), con due esposizioni distinte (es. "N" e
+    "E"), ne vale 2.
     """
     lato = sqrt(dati.superficie)
-    return lato * dati.altezza * dati.num_esposizioni
+    num_lati_esterni = 2 if dati.stanza_angolo else 1
+    return lato * dati.altezza * num_lati_esterni
 
 
 def calcola_q_trasmissione(

@@ -1,3 +1,5 @@
+from math import sqrt
+
 import pytest
 
 from calcolatore.thermal_calc import (
@@ -6,6 +8,7 @@ from calcolatore.thermal_calc import (
     calcola_carico_stanza,
     calcola_q_trasmissione,
     calcola_q_ventilazione,
+    superficie_parete_esterna_lorda,
 )
 
 
@@ -16,7 +19,8 @@ TRASMITTANZE_CLASSE_A = Trasmittanze(parete=0.24, copertura=0.22, pavimento=0.26
 def test_calcolo_a_mano_stanza_20mq_isolamento_scarso():
     """Verifica su un caso calcolabile a mano.
 
-    Stanza 20 m², h 2.7 m, 1 lato esposto, 4 m² di finestre,
+    Stanza 20 m², h 2.7 m, non d'angolo (1 solo lato esterno anche se
+    l'esposizione è composta, es. "N-E"), 4 m² di finestre,
     ricambi 0.5 vol/h, interna 20°C, esterna -5°C (ΔT = 25 K).
 
     lato = sqrt(20) = 4.47214 m
@@ -35,7 +39,6 @@ def test_calcolo_a_mano_stanza_20mq_isolamento_scarso():
         nome="Soggiorno",
         superficie=20,
         altezza=2.7,
-        num_esposizioni=1,
         superficie_finestre=4,
         ricambi_aria_orari=0.5,
     )
@@ -49,13 +52,35 @@ def test_calcolo_a_mano_stanza_20mq_isolamento_scarso():
     assert risultato.q_totale_w == pytest.approx(971.743, abs=0.01)
 
 
+def test_esposizione_singola_anche_composta_vale_un_solo_lato():
+    """Un'esposizione singola, anche intermedia/composta (es. "N-E" nella
+    convenzione italiana), è UNA parete, non due: senza stanza_angolo=True
+    la superficie disperdente lorda deve corrispondere a un solo lato."""
+    stanza = DatiStanza(nome="Camera", superficie=20, altezza=2.7, superficie_finestre=4)
+
+    assert superficie_parete_esterna_lorda(stanza) == pytest.approx(sqrt(20) * 2.7)
+
+
+def test_stanza_angolo_raddoppia_la_parete_esterna_lorda():
+    """Solo una stanza d'angolo esplicita (due esposizioni distinte, es.
+    "N" e "E") ha 2 lati esterni disperdenti."""
+    stanza_normale = DatiStanza(nome="Camera", superficie=20, altezza=2.7, superficie_finestre=4)
+    stanza_angolo = DatiStanza(
+        nome="Camera", superficie=20, altezza=2.7, superficie_finestre=4, stanza_angolo=True
+    )
+
+    lorda_normale = superficie_parete_esterna_lorda(stanza_normale)
+    lorda_angolo = superficie_parete_esterna_lorda(stanza_angolo)
+
+    assert lorda_angolo == pytest.approx(lorda_normale * 2)
+
+
 def test_isolamento_scarso_disperde_piu_di_classe_a():
     """Stessa stanza, isolamento scarso vs classe A: il rapporto deve avere senso fisico."""
     stanza = DatiStanza(
         nome="Camera",
         superficie=20,
         altezza=2.7,
-        num_esposizioni=1,
         superficie_finestre=4,
         ricambi_aria_orari=0.5,
     )
@@ -82,8 +107,8 @@ def test_delta_t_zero_carico_nullo():
         nome="Ufficio",
         superficie=15,
         altezza=2.7,
-        num_esposizioni=2,
         superficie_finestre=3,
+        stanza_angolo=True,
     )
 
     risultato = calcola_carico_stanza(
@@ -96,7 +121,7 @@ def test_delta_t_zero_carico_nullo():
 
 
 def test_temperatura_esterna_maggiore_di_interna_solleva_errore():
-    stanza = DatiStanza(nome="Bagno", superficie=6, altezza=2.7, num_esposizioni=1)
+    stanza = DatiStanza(nome="Bagno", superficie=6, altezza=2.7)
 
     with pytest.raises(ValueError):
         calcola_carico_stanza(
@@ -111,7 +136,6 @@ def test_ultimo_piano_e_piano_terra_aggiungono_dispersioni():
         nome="Stanza",
         superficie=20,
         altezza=2.7,
-        num_esposizioni=1,
         superficie_finestre=4,
     )
     con_copertura = DatiStanza(**{**base.__dict__, "ultimo_piano": True})
@@ -132,10 +156,10 @@ def test_ultimo_piano_e_piano_terra_aggiungono_dispersioni():
 
 def test_ventilazione_proporzionale_a_ricambi_aria():
     stanza_std = DatiStanza(
-        nome="Cucina", superficie=10, altezza=2.7, num_esposizioni=1, ricambi_aria_orari=0.5
+        nome="Cucina", superficie=10, altezza=2.7, ricambi_aria_orari=0.5
     )
     stanza_doppi_ricambi = DatiStanza(
-        nome="Cucina", superficie=10, altezza=2.7, num_esposizioni=1, ricambi_aria_orari=1.0
+        nome="Cucina", superficie=10, altezza=2.7, ricambi_aria_orari=1.0
     )
 
     q_std = calcola_q_ventilazione(stanza_std, delta_t=20)

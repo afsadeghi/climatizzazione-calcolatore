@@ -21,8 +21,14 @@ def test_get_dati_climatici_citta_non_disponibile_solleva_errore():
         get_dati_climatici("Amsterdam")
 
 
+def test_bolzano_e_zona_climatica_e_non_f():
+    """Regressione: Bolzano è zona E secondo DPR 412/93 Allegato A
+    (elencata insieme a Milano, Torino, Bologna, Venezia), non zona F."""
+    assert get_dati_climatici("Bolzano").zona_climatica == "E"
+
+
 def test_zone_climatiche_piu_fredde_hanno_temperatura_progetto_piu_bassa():
-    """Sanity check: da Palermo (B) a Bolzano (F) la temperatura di
+    """Sanity check: da Palermo (B) a Bolzano (E) la temperatura di
     progetto invernale deve scendere in modo monotono con la severità
     climatica crescente."""
     ordine = ["Palermo", "Napoli", "Roma", "Milano", "Bolzano"]

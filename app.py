@@ -18,10 +18,22 @@ from calcolatore.climate_data import (
     get_trasmittanze,
 )
 from calcolatore.interface_bridge import InputStanza, converti_stanze
+from calcolatore.raccomandazione import DISCLAIMER as DISCLAIMER_RACCOMANDAZIONE
+from calcolatore.raccomandazione import (
+    Candidato,
+    ZonaCarico,
+    raccomanda_impianti,
+)
 from calcolatore.thermal_calc import calcola_carico_edificio
 from calcolatore.zoning import MAX_ZONE_DEFAULT, raggruppa_in_zone
 
 MAX_STANZE = 6
+
+PREFERENZE = {
+    "bilanciato": "Bilanciato",
+    "efficienza": "Efficienza (SEER/SCOP più alti)",
+    "costo": "Costo (fascia prezzo più bassa)",
+}
 
 ESPOSIZIONI = ["N", "S", "E", "O", "N-E", "N-O", "S-E", "S-O"]
 
@@ -96,6 +108,66 @@ def _mostra_banner_avviso() -> None:
         """,
         unsafe_allow_html=True,
     )
+
+
+def _mostra_banner_raccomandazione() -> None:
+    """Disclaimer permanente per la sezione di raccomandazione modelli,
+    coerente in stile con il banner principale ma con colore distinto
+    (informativo, non di avviso): sempre visibile sopra i risultati,
+    non un tooltip né una nota in fondo alla pagina."""
+    st.markdown(
+        f"""
+        <style>
+        .disclaimer-raccomandazione {{
+            background-color: #1f3a5f;
+            color: #ffffff;
+            padding: 0.6rem 1rem;
+            border-radius: 0.25rem;
+            margin: 0.5rem 0 1rem 0;
+            border: 1px solid #2f5488;
+        }}
+        </style>
+        <div class="disclaimer-raccomandazione">
+        {DISCLAIMER_RACCOMANDAZIONE}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _mostra_candidato(candidato: Candidato) -> None:
+    m = candidato.modello
+    st.markdown(
+        f"- **{m.produttore} {m.modello}** ({m.tipologia}, {m.potenza_nominale_kw:.1f} kW nominale, "
+        f"margine {candidato.margine:.2f}×, fascia {m.fascia_prezzo})\n\n"
+        f"  {candidato.motivazione}"
+    )
+
+
+def _mostra_raccomandazione(zone_carico: list[ZonaCarico], preferenza: str) -> None:
+    st.subheader("Raccomandazione modelli")
+    _mostra_banner_raccomandazione()
+
+    risultato = raccomanda_impianti(zone_carico, preferenza=preferenza)
+
+    for raccomandazione in risultato.per_zona:
+        st.markdown(f"**{raccomandazione.zona.nome}** ({raccomandazione.zona.carico_termico_kw:.2f} kW)")
+        if raccomandazione.messaggio_nessun_modello:
+            st.warning(raccomandazione.messaggio_nessun_modello)
+            continue
+        for candidato in raccomandazione.candidati:
+            _mostra_candidato(candidato)
+        if raccomandazione.nota:
+            st.info(raccomandazione.nota)
+
+    alt = risultato.alternativa_multizona
+    if alt is not None:
+        st.markdown(f"**Alternativa multizona** (intero edificio, {alt.numero_zone} zone, {alt.carico_totale_kw:.2f} kW totali)")
+        if alt.messaggio_nessun_modello:
+            st.warning(alt.messaggio_nessun_modello)
+        else:
+            for candidato in alt.candidati:
+                _mostra_candidato(candidato)
 
 
 def _input_edificio() -> tuple[str, str]:
@@ -247,6 +319,20 @@ def main() -> None:
     zone = raggruppa_in_zone(stanze_zonizzazione, max_zone=int(max_zone))
     for zona in zone:
         st.write(f"**{zona.nome}**: {', '.join(zona.stanze)}")
+
+    carico_per_stanza_kw = {r.nome: r.q_totale_kw for r in risultati}
+    zone_carico = [
+        ZonaCarico(nome=zona.nome, carico_termico_kw=sum(carico_per_stanza_kw[nome] for nome in zona.stanze))
+        for zona in zone
+    ]
+    preferenza_opzioni = list(PREFERENZE)
+    preferenza = st.selectbox(
+        "Preferenza raccomandazione",
+        options=preferenza_opzioni,
+        index=preferenza_opzioni.index("bilanciato"),
+        format_func=lambda k: PREFERENZE[k],
+    )
+    _mostra_raccomandazione(zone_carico, preferenza)
 
     st.info(
         "Non ancora disponibili in questa versione, previsti per una fase successiva: "

@@ -30,10 +30,39 @@ def test_bolzano_e_zona_climatica_e_non_f():
 def test_zone_climatiche_piu_fredde_hanno_temperatura_progetto_piu_bassa():
     """Sanity check: da Palermo (B) a Bolzano (E) la temperatura di
     progetto invernale deve scendere in modo monotono con la severità
-    climatica crescente."""
+    climatica crescente.
+
+    Cuneo (zona F) è volutamente escluso da questo confronto: i
+    gradi-giorno (che definiscono la zona) e la temperatura minima di
+    progetto (UNI 5364) misurano cose diverse — il primo la severità
+    cumulata sulla stagione, la seconda il picco di freddo — e non sono
+    garantiti monotoni tra loro città per città (Cuneo ha GG più alti di
+    Bolzano ma una minima di progetto meno estrema, per via del clima
+    continentale di pianura contro quello di fondovalle alpino)."""
     ordine = ["Palermo", "Napoli", "Roma", "Milano", "Bolzano"]
     temperature = [get_dati_climatici(c).temperatura_esterna_progetto for c in ordine]
     assert temperature == sorted(temperature, reverse=True)
+
+
+def test_gradi_giorno_coerenti_con_lintervallo_della_zona_climatica():
+    """I gradi-giorno di ogni città devono ricadere nell'intervallo DPR
+    412/93 corrispondente alla zona climatica dichiarata."""
+    intervalli_gg = {
+        "B": (601, 900),
+        "C": (901, 1400),
+        "D": (1401, 2100),
+        "E": (2101, 3000),
+        "F": (3001, float("inf")),
+    }
+    for dati in CITTA_DISPONIBILI.values():
+        minimo, massimo = intervalli_gg[dati.zona_climatica]
+        assert minimo <= dati.gradi_giorno <= massimo, dati.citta
+
+
+def test_cuneo_e_zona_climatica_f():
+    dati = get_dati_climatici("Cuneo")
+    assert dati.zona_climatica == "F"
+    assert dati.gradi_giorno == 3012
 
 
 def test_get_trasmittanze_livello_valido():

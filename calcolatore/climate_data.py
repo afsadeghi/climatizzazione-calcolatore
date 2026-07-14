@@ -25,13 +25,13 @@ class DatiClimatici:
 
 
 # MVP: elenco semplificato di città rappresentative delle zone climatiche
-# B-E (verificate contro DPR 412/93 Allegato A, luglio 2026). La zona A
-# copre in Italia solo pochissimi comuni ed è omessa per l'MVP. La zona F
-# non è rappresentata: i candidati più ovvi (Cuneo, Belluno, Trento) non
-# sono stati confermati con un valore di gradi-giorno verificato con
-# certezza contro una fonte primaria — vedi nota in fondo al file.
+# B-F (verificate contro DPR 412/93 Allegato A, luglio 2026). La zona A
+# copre in Italia solo pochissimi comuni ed è omessa per l'MVP.
 # Bolzano è zona E (non F, correzione rispetto a una prima stesura errata),
 # coerente con Milano e Torino nella tabella ufficiale.
+# Cuneo (zona F, 3012 GG) è verificata su Tuttitalia.it, che cita il DPR
+# 412/93 con aggiornamenti al 31/10/2009 (coerente con la soglia GG>3000
+# di zona F); temperatura di progetto -10°C da tabella UNI 5364.
 CITTA_DISPONIBILI: dict[str, DatiClimatici] = {
     "Palermo": DatiClimatici("Palermo", "B", 751, 5.0),
     "Napoli": DatiClimatici("Napoli", "C", 1034, 2.0),
@@ -39,14 +39,8 @@ CITTA_DISPONIBILI: dict[str, DatiClimatici] = {
     "Milano": DatiClimatici("Milano", "E", 2404, -5.0),
     "Torino": DatiClimatici("Torino", "E", 2617, -8.0),
     "Bolzano": DatiClimatici("Bolzano", "E", 2791, -15.0),
+    "Cuneo": DatiClimatici("Cuneo", "F", 3012, -10.0),
 }
-
-# TODO: aggiungere una città rappresentativa della zona climatica F
-# (>3000 GG, es. Cuneo/Belluno/Trento) non appena si dispone di un valore
-# di gradi-giorno riscontrato su una fonte primaria affidabile (Gazzetta
-# Ufficiale / Allegato A DPR 412/93). Trento in particolare è un cattivo
-# candidato "pulito": il comune capoluogo risulta diviso tra zona E (sotto
-# 430 m) e zona F (sopra 430 m) per effetto del DM 6/10/1997.
 
 
 @dataclass(frozen=True)

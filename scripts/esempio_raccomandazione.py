@@ -92,6 +92,8 @@ def main() -> None:
             continue
         for candidato in raccomandazione.candidati:
             _stampa_candidato(candidato)
+        if raccomandazione.nota:
+            print(f"  NOTA: {raccomandazione.nota}")
 
     print("\n=== Alternativa multizona (intero edificio) ===")
     alt = risultato.alternativa_multizona

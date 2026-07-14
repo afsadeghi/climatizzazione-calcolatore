@@ -43,6 +43,13 @@ DISCLAIMER = (
 FLAG_EFFICIENZA_MANCANTE = "dati di efficienza non disponibili — verificare scheda tecnica"
 FLAG_POTENZA_MIN_MANCANTE = "potenza minima di modulazione non verificata — verificare scheda tecnica"
 
+NOTA_TUTTI_SOVRADIMENSIONATI = (
+    "Nessun modello del catalogo è ben dimensionato per questa zona presa "
+    "singolarmente — valuta l'alternativa multizona mostrata sotto, o "
+    "l'accorpamento fisico di questa zona con una adiacente prima "
+    "dell'acquisto."
+)
+
 _ORDINE_PREZZO = {"economico": 3, "medio": 2, "premium": 1}
 
 
@@ -72,6 +79,7 @@ class RaccomandazioneZona:
     zona: ZonaCarico
     candidati: list[Candidato]  # 0-3, già ordinati secondo la preferenza
     messaggio_nessun_modello: str | None
+    nota: str | None = None  # es. NOTA_TUTTI_SOVRADIMENSIONATI
 
 
 @dataclass(frozen=True)
@@ -208,6 +216,13 @@ def _ordina_per_preferenza(candidati: list[Candidato], preferenza: str) -> list[
     return sorted(candidati, key=punteggio_bilanciato, reverse=True)
 
 
+def _tutti_sovradimensionati(candidati: list[Candidato]) -> bool:
+    """True se tutti i candidati mostrati hanno un margine di
+    sovradimensionamento sopra la soglia ideale (> MARGINE_MAX) — nessuno
+    è semplicemente "ben dimensionato" per la zona presa da sola."""
+    return bool(candidati) and all(c.margine > MARGINE_MAX for c in candidati)
+
+
 def _messaggio_nessun_modello(carico_kw: float, modelli: list[ModelloClimatizzatore]) -> str:
     potenze_min_note = [m.potenza_min_kw for m in modelli if m.potenza_min_kw is not None]
     potenze_max = [m.potenza_max_kw for m in modelli]
@@ -240,7 +255,10 @@ def raccomanda_per_zona(
 
     candidati = [_candidato_da_modello(m, zona.carico_termico_kw) for m in idonei]
     candidati_ordinati = _ordina_per_preferenza(candidati, preferenza)[:3]
-    return RaccomandazioneZona(zona=zona, candidati=candidati_ordinati, messaggio_nessun_modello=None)
+    nota = NOTA_TUTTI_SOVRADIMENSIONATI if _tutti_sovradimensionati(candidati_ordinati) else None
+    return RaccomandazioneZona(
+        zona=zona, candidati=candidati_ordinati, messaggio_nessun_modello=None, nota=nota
+    )
 
 
 def _alternativa_multizona(

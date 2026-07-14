@@ -11,6 +11,7 @@ from calcolatore.raccomandazione import (
     DISCLAIMER,
     FLAG_EFFICIENZA_MANCANTE,
     FLAG_POTENZA_MIN_MANCANTE,
+    NOTA_TUTTI_SOVRADIMENSIONATI,
     ZonaCarico,
     _ordina_per_preferenza,
     raccomanda_impianti,
@@ -199,3 +200,59 @@ def test_catalogo_iniziale_non_modificato_dal_modulo():
     raccomanda_impianti([zona], preferenza="bilanciato")
 
     assert len(CATALOGO_INIZIALE) == lunghezza_originale
+
+
+def test_fba71a9_non_viene_mai_escluso_per_carico_basso_causa_potenza_min_mancante():
+    """Comportamento intenzionale (non un bug): poiché potenza_min_kw di
+    FBA71A9 è None/non verificato, il modulo non lo esclude nemmeno per
+    un carico molto basso — non potendo affermare con certezza che NON
+    lo copra. Resta candidato per capacità, pesantemente sovradimensionato
+    e con il flag esplicito di dato non verificato, invece di sparire
+    silenziosamente dal matching."""
+    zona = ZonaCarico(nome="RipostiglioMinuscolo", carico_termico_kw=0.05)
+
+    raccomandazione = raccomanda_per_zona(zona, preferenza="bilanciato")
+
+    assert raccomandazione.messaggio_nessun_modello is None
+    nomi_candidati = [c.modello.modello for c in raccomandazione.candidati]
+    assert "FBA71A9 canalizzabile media prevalenza" in nomi_candidati
+
+    candidato_fba = next(
+        c for c in raccomandazione.candidati if c.modello.modello == "FBA71A9 canalizzabile media prevalenza"
+    )
+    assert FLAG_POTENZA_MIN_MANCANTE in candidato_fba.flags
+
+
+def test_nota_presente_quando_tutti_i_candidati_sono_sovradimensionati():
+    """Caso Zona1 (Soggiorno) del riferimento: entrambi i candidati hanno
+    margine ben oltre il 30%, quindi la nota deve comparire per suggerire
+    l'alternativa multizona o l'accorpamento fisico."""
+    zona = ZonaCarico(nome="Soggiorno", carico_termico_kw=0.849)
+
+    raccomandazione = raccomanda_per_zona(zona, preferenza="bilanciato")
+
+    assert raccomandazione.nota == NOTA_TUTTI_SOVRADIMENSIONATI
+
+
+def test_nota_assente_quando_almeno_un_candidato_e_ben_dimensionato():
+    """Con un carico scelto apposta perché FTXM35R/MSZ-HR35VF (nominale
+    3.4 kW) rientrino nel margine ideale 10-30% (3.4 / 1.2 = 2.833 kW),
+    la nota non deve comparire anche se FBA71A9 resta sovradimensionato."""
+    zona = ZonaCarico(nome="ZonaBenDimensionata", carico_termico_kw=3.4 / 1.2)
+
+    raccomandazione = raccomanda_per_zona(zona, preferenza="bilanciato")
+
+    candidati_ideali = [c for c in raccomandazione.candidati if c.dentro_margine_ideale]
+    assert candidati_ideali, "il caso di test deve produrre almeno un candidato ben dimensionato"
+    assert raccomandazione.nota is None
+
+
+def test_nota_assente_quando_nessun_modello_adeguato():
+    """Se scatta il messaggio 'nessun modello adeguato' (candidati vuoti),
+    la nota sui margini elevati non ha senso e deve restare assente."""
+    zona = ZonaCarico(nome="Capannone", carico_termico_kw=10.0)
+
+    raccomandazione = raccomanda_per_zona(zona, preferenza="bilanciato")
+
+    assert raccomandazione.candidati == []
+    assert raccomandazione.nota is None

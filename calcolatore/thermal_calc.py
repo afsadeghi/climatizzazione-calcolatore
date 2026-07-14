@@ -51,6 +51,13 @@ class RisultatoStanza:
         return self.q_totale_w / 1000
 
 
+# NOTA - bias noto dell'approssimazione a pianta quadrata: a parità di
+# superficie, una stanza rettangolare allungata (es. 4m x 5m) ha un
+# perimetro maggiore di una stanza quadrata equivalente (sqrt(20) x sqrt(20)),
+# quindi più parete realmente disperdente di quella stimata qui. L'errore
+# cresce con il rapporto di allungamento della stanza ed è quindi una
+# sottostima sistematica, non casuale: da tenere presente nell'uso come
+# stima preliminare, non sostitutiva di un rilievo geometrico puntuale.
 def superficie_parete_esterna_lorda(dati: DatiStanza) -> float:
     """Stima la superficie lorda di parete esterna disperdente.
 
